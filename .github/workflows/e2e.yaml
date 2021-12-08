@@ -146,11 +146,17 @@ jobs:
           kubectl -n helm-system delete -f config/testdata/install-create-target-ns
       - name: Run install fail test
         run: |
+          set -x
           test_name=install-fail
           kubectl -n helm-system apply -f config/testdata/$test_name
+          echo "before"
+          kubectl -n helm-system get helmrelease/$test_name
           echo -n ">>> Waiting for expected conditions"
           count=0
+          sleep 10
           until [ 'true' == "$( kubectl -n helm-system get helmrelease/$test_name -o json | jq '.status.conditions | map( { (.type): .status } ) | add | .Released=="False" and .Ready=="False"' )" ]; do
+            echo "loop"
+            kubectl -n helm-system get helmrelease/$test_name
             echo -n '.'
             sleep 5
             count=$((count + 1))
