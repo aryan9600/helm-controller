@@ -267,7 +267,7 @@ invalid`,
 					Values:     values,
 				},
 			}
-			got, err := r.composeValues(logr.NewContext(context.TODO(), log.NullLogger{}), hr)
+			got, err := r.composeValues(logr.NewContext(context.TODO(), logr.New(log.NullLogSink{})), hr)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("composeValues() error = %v, wantErr %v", err, tt.wantErr)
 				return

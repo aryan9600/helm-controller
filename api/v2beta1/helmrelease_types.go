@@ -27,6 +27,7 @@ import (
 
 	"github.com/fluxcd/pkg/apis/kustomize"
 	"github.com/fluxcd/pkg/apis/meta"
+	sourcev1 "github.com/fluxcd/source-controller/api/v1beta2"
 )
 
 const HelmReleaseKind = "HelmRelease"
@@ -259,6 +260,9 @@ type HelmChartTemplateSpec struct {
 	// +optional
 	// +deprecated
 	ValuesFile string `json:"valuesFile,omitempty"`
+	// VerificationKeyring for verifying the packaged chart's signature using a provenance file.
+	// +optional
+	VerificationKeyring *sourcev1.VerificationKeyring `json:"verificationKeyring,omitempty"`
 }
 
 // GetInterval returns the configured interval for the v1beta1.HelmChart,

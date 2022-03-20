@@ -21,7 +21,7 @@ import (
 	"testing"
 	"time"
 
-	sourcev1 "github.com/fluxcd/source-controller/api/v1beta1"
+	sourcev1 "github.com/fluxcd/source-controller/api/v1beta2"
 	"github.com/go-logr/logr"
 	. "github.com/onsi/gomega"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -160,7 +160,7 @@ func TestHelmReleaseReconciler_reconcileChart(t *testing.T) {
 				Client: c,
 			}
 
-			hc, err := r.reconcileChart(logr.NewContext(context.TODO(), log.NullLogger{}), tt.hr)
+			hc, err := r.reconcileChart(log.IntoContext(context.TODO(), logr.New(log.NullLogSink{})), tt.hr)
 			if tt.expectErr {
 				g.Expect(err).To(HaveOccurred())
 				g.Expect(hc).To(BeNil())

@@ -23,7 +23,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/go-logr/logr"
 	"github.com/hashicorp/go-retryablehttp"
 	"helm.sh/helm/v3/pkg/chart"
 	"helm.sh/helm/v3/pkg/chartutil"
@@ -53,7 +52,7 @@ import (
 	"github.com/fluxcd/pkg/runtime/patch"
 	"github.com/fluxcd/pkg/runtime/predicates"
 	"github.com/fluxcd/pkg/runtime/transform"
-	sourcev1 "github.com/fluxcd/source-controller/api/v1beta1"
+	sourcev1 "github.com/fluxcd/source-controller/api/v1beta2"
 
 	v2 "github.com/fluxcd/helm-controller/api/v2beta1"
 	"github.com/fluxcd/helm-controller/internal/kube"
@@ -134,7 +133,7 @@ func (c ConditionError) Error() string {
 
 func (r *HelmReleaseReconciler) Reconcile(ctx context.Context, req ctrl.Request) (result ctrl.Result, retErr error) {
 	start := time.Now()
-	log := logr.FromContext(ctx)
+	log := ctrl.LoggerFrom(ctx)
 
 	obj := &v2.HelmRelease{}
 	if err := r.Get(ctx, req.NamespacedName, obj); err != nil {
@@ -244,7 +243,7 @@ func (r *HelmReleaseReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 }
 
 func (r *HelmReleaseReconciler) reconcile(ctx context.Context, obj *v2.HelmRelease) (ctrl.Result, error) {
-	log := logr.FromContext(ctx)
+	log := ctrl.LoggerFrom(ctx)
 
 	// Mark the resource as under reconciliation
 	conditions.MarkReconciling(obj, meta.ProgressingReason, "")
@@ -316,7 +315,7 @@ func (r *HelmReleaseReconciler) reconcile(ctx context.Context, obj *v2.HelmRelea
 }
 
 func (r *HelmReleaseReconciler) reconcileRelease(ctx context.Context, hr *v2.HelmRelease, chart *chart.Chart, values chartutil.Values) (ctrl.Result, error) {
-	log := logr.FromContext(ctx)
+	log := ctrl.LoggerFrom(ctx)
 
 	// Initialize Helm action runner
 	getter, err := r.getRESTClientGetter(ctx, hr)
@@ -609,7 +608,7 @@ func (r *HelmReleaseReconciler) composeValues(ctx context.Context, hr *v2.HelmRe
 				if err := r.Get(ctx, namespacedName, resource); err != nil {
 					if apierrors.IsNotFound(err) {
 						if v.Optional {
-							(logr.FromContext(ctx)).
+							(ctrl.LoggerFrom(ctx)).
 								Info(fmt.Sprintf("could not find optional %s '%s'", v.Kind, namespacedName))
 							continue
 						}
@@ -621,7 +620,7 @@ func (r *HelmReleaseReconciler) composeValues(ctx context.Context, hr *v2.HelmRe
 			}
 			if resource == nil {
 				if v.Optional {
-					(logr.FromContext(ctx)).Info(fmt.Sprintf("could not find optional %s '%s'", v.Kind, namespacedName))
+					(ctrl.LoggerFrom(ctx)).Info(fmt.Sprintf("could not find optional %s '%s'", v.Kind, namespacedName))
 					continue
 				}
 				return nil, fmt.Errorf("could not find %s '%s'", v.Kind, namespacedName)
@@ -642,7 +641,7 @@ func (r *HelmReleaseReconciler) composeValues(ctx context.Context, hr *v2.HelmRe
 				if err := r.Get(ctx, namespacedName, resource); err != nil {
 					if apierrors.IsNotFound(err) {
 						if v.Optional {
-							(logr.FromContext(ctx)).
+							(ctrl.LoggerFrom(ctx)).
 								Info(fmt.Sprintf("could not find optional %s '%s'", v.Kind, namespacedName))
 							continue
 						}
@@ -654,7 +653,7 @@ func (r *HelmReleaseReconciler) composeValues(ctx context.Context, hr *v2.HelmRe
 			}
 			if resource == nil {
 				if v.Optional {
-					(logr.FromContext(ctx)).Info(fmt.Sprintf("could not find optional %s '%s'", v.Kind, namespacedName))
+					(ctrl.LoggerFrom(ctx)).Info(fmt.Sprintf("could not find optional %s '%s'", v.Kind, namespacedName))
 					continue
 				}
 				return nil, fmt.Errorf("could not find %s '%s'", v.Kind, namespacedName)
@@ -712,16 +711,16 @@ func (r *HelmReleaseReconciler) reconcileDelete(ctx context.Context, hr *v2.Helm
 		if err != nil {
 			return ctrl.Result{}, err
 		}
-		run, err := runner.NewRunner(getter, hr.GetStorageNamespace(), logr.FromContext(ctx))
+		run, err := runner.NewRunner(getter, hr.GetStorageNamespace(), ctrl.LoggerFrom(ctx))
 		if err != nil {
 			return ctrl.Result{}, err
 		}
 		if err := run.Uninstall(*hr); err != nil && !errors.Is(err, driver.ErrReleaseNotFound) {
 			return ctrl.Result{}, err
 		}
-		logr.FromContext(ctx).Info("uninstalled Helm release for deleted resource")
+		ctrl.LoggerFrom(ctx).Info("uninstalled Helm release for deleted resource")
 	} else {
-		logr.FromContext(ctx).Info("skipping Helm uninstall for suspended resource")
+		ctrl.LoggerFrom(ctx).Info("skipping Helm uninstall for suspended resource")
 	}
 
 	// Remove our finalizer from the list
