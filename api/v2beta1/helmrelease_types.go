@@ -828,6 +828,18 @@ type HelmReleaseStatus struct {
 	// state. It is reset after a successful reconciliation.
 	// +optional
 	UpgradeFailures int64 `json:"upgradeFailures,omitempty"`
+
+	// ReleaseNamespace is the namespace where the current Helm release is installed.
+	// +optional
+	ReleaseNamespace string `json:"releaseNamespace,omitempty"`
+
+	// ReleaseName is the name of the currently installed Helm release.
+	// +optional
+	ReleaseName string `json:"releaseName,omitempty"`
+
+	// StorageNamespace is the namespace where the currently installed Helm release is stored.
+	// +optional
+	StorageNamespace string `json:"storageNamespace,omitempty"`
 }
 
 // GetHelmChart returns the namespace and name of the HelmChart.
@@ -970,6 +982,9 @@ func (in HelmRelease) GetReleaseNamespace() string {
 func (in HelmRelease) GetStorageNamespace() string {
 	if in.Spec.StorageNamespace != "" {
 		return in.Spec.StorageNamespace
+	}
+	if in.Spec.TargetNamespace != "" {
+		return in.Spec.TargetNamespace
 	}
 	return in.Namespace
 }

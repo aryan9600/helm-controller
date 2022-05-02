@@ -821,6 +821,15 @@ spec:
                 description: ObservedGeneration is the last observed generation.
                 format: int64
                 type: integer
+              releaseName:
+                type: string
+              releaseNamespace:
+                description: 'TODO: Should we store more info about the installed
+                  release in Status? ReleaseNamespace is the namespace where the current
+                  Helm Release is installed.'
+                type: string
+              storageNamespace:
+                type: string
               upgradeFailures:
                 description: UpgradeFailures is the upgrade failure count against
                   the latest desired state. It is reset after a successful reconciliation.

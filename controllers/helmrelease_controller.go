@@ -356,6 +356,12 @@ func (r *HelmReleaseReconciler) reconcileRelease(ctx context.Context,
 		}
 	}
 
+	// Uninstall current helm release if needed.
+	err = r.cleanUpHelmReleaseIfNeeded(ctx, hr)
+	if err != nil {
+		return v2.HelmReleaseNotReady(hr, v2.UninstallFailedReason, err.Error()), err
+	}
+
 	// Deploy the release.
 	var deployAction v2.DeploymentAction
 	if rel == nil {
@@ -414,7 +420,7 @@ func (r *HelmReleaseReconciler) reconcileRelease(ctx context.Context,
 					remediationErr = r.handleHelmActionResult(ctx, &hr, revision, rollbackErr, "rollback",
 						v2.RemediatedCondition, v2.RollbackSucceededReason, v2.RollbackFailedReason)
 				case v2.UninstallRemediationStrategy:
-					uninstallErr := run.Uninstall(hr)
+					uninstallErr := run.Uninstall(hr, "")
 					remediationErr = r.handleHelmActionResult(ctx, &hr, revision, uninstallErr, "uninstall",
 						v2.RemediatedCondition, v2.UninstallSucceededReason, v2.UninstallFailedReason)
 				}
@@ -435,6 +441,9 @@ func (r *HelmReleaseReconciler) reconcileRelease(ctx context.Context,
 	}
 
 	hr.Status.LastReleaseRevision = util.ReleaseRevision(rel)
+	hr.Status.ReleaseName = hr.GetReleaseName()
+	hr.Status.ReleaseNamespace = hr.GetReleaseNamespace()
+	hr.Status.StorageNamespace = hr.GetStorageNamespace()
 
 	if err != nil {
 		reason := v2.ReconciliationFailedReason
@@ -510,14 +519,14 @@ func (r *HelmReleaseReconciler) getRESTClientGetter(ctx context.Context, hr v2.H
 		if len(kubeConfig) == 0 {
 			return nil, fmt.Errorf("KubeConfig secret '%s' does not contain a 'value' key", secretName)
 		}
-		return kube.NewMemoryRESTClientGetter(kubeConfig, hr.GetReleaseNamespace(), impersonateAccount, r.Config.QPS, r.Config.Burst, r.KubeConfigOpts), nil
+		return kube.NewMemoryRESTClientGetter(kubeConfig, "", impersonateAccount, r.Config.QPS, r.Config.Burst, r.KubeConfigOpts), nil
 	}
 
 	if r.DefaultServiceAccount != "" || hr.Spec.ServiceAccountName != "" {
-		return kube.NewInClusterRESTClientGetter(&config, hr.GetReleaseNamespace()), nil
+		return kube.NewInClusterRESTClientGetter(&config, ""), nil
 	}
 
-	return kube.NewInClusterRESTClientGetter(r.Config, hr.GetReleaseNamespace()), nil
+	return kube.NewInClusterRESTClientGetter(r.Config, ""), nil
 
 }
 
@@ -655,7 +664,7 @@ func (r *HelmReleaseReconciler) reconcileDelete(ctx context.Context, hr v2.HelmR
 		if err != nil {
 			return ctrl.Result{}, err
 		}
-		if err := run.Uninstall(hr); err != nil && !errors.Is(err, driver.ErrReleaseNotFound) {
+		if err := run.Uninstall(hr, ""); err != nil && !errors.Is(err, driver.ErrReleaseNotFound) {
 			return ctrl.Result{}, err
 		}
 		ctrl.LoggerFrom(ctx).Info("uninstalled Helm release for deleted resource")
@@ -793,4 +802,22 @@ func (r *HelmReleaseReconciler) recordReadiness(ctx context.Context, hr v2.HelmR
 			Status: metav1.ConditionUnknown,
 		}, !hr.DeletionTimestamp.IsZero())
 	}
+}
+
+// cleanUpHelmReleaseIfNeeded compares the spec with the status of the HelmRelease and uninstalls
+// the currently installed helm release in required.
+func (r *HelmReleaseReconciler) cleanUpHelmReleaseIfNeeded(ctx context.Context, hr v2.HelmRelease) error {
+	if hr.Status.ReleaseName != "" && hr.Status.ReleaseNamespace != "" {
+		if hr.GetReleaseName() != hr.Status.ReleaseName || hr.GetReleaseNamespace() != hr.Status.ReleaseNamespace {
+			log := ctrl.LoggerFrom(ctx)
+			unGetter := kube.NewInClusterRESTClientGetter(r.Config, hr.Status.ReleaseNamespace)
+			uninstallRun, err := runner.NewRunner(unGetter, hr.Status.StorageNamespace, log)
+			err = uninstallRun.Uninstall(hr, hr.Status.ReleaseName)
+			if err != nil {
+				err = fmt.Errorf("could not uninstall the currently installed Helm release %s: %s", hr.Status.ReleaseName, err.Error())
+				return err
+			}
+		}
+	}
+	return nil
 }

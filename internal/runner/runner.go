@@ -366,7 +366,7 @@ func (r *Runner) Rollback(hr v2.HelmRelease) error {
 }
 
 // Uninstall runs an Helm uninstall action for the given v2beta1.HelmRelease.
-func (r *Runner) Uninstall(hr v2.HelmRelease) error {
+func (r *Runner) Uninstall(hr v2.HelmRelease, releaseOverride string) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	defer r.logBuffer.Reset()
@@ -377,7 +377,12 @@ func (r *Runner) Uninstall(hr v2.HelmRelease) error {
 	uninstall.KeepHistory = hr.Spec.GetUninstall().KeepHistory
 	uninstall.Wait = !hr.Spec.GetUninstall().DisableWait
 
-	_, err := uninstall.Run(hr.GetReleaseName())
+	release := hr.GetReleaseName()
+	if releaseOverride != "" {
+		release = releaseOverride
+	}
+
+	_, err := uninstall.Run(release)
 	return wrapActionErr(r.logBuffer, err)
 }
 
